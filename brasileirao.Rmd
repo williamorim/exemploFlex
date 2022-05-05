@@ -1,0 +1,141 @@
+---
+title: "Brasileirão"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    #theme: bootstrap
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+
+dados <- readr::read_csv("https://raw.githubusercontent.com/williamorim/brasileirao/master/data-raw/csv/matches.csv")
+
+source("R/utils.R")
+```
+
+Visão geral
+==============================================================
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Sobre
+
+Dashboard analisando os dados do Campeonato Brasileiro de Futebol Masculino de 2003 a 2022. Queremos comparar estatísticas do campeoanto vigente com as séries históricas.
+
+Os dados estão disponíveis [aqui](https://raw.githubusercontent.com/williamorim/brasileirao/master/data-raw/csv/matches.csv).
+
+Criado pela turma de março de 2022 do Workshop Ciência de Dados na Prática, da [Curso-R](https://curso-r.com).
+
+Row
+-----------------------------------------------------------------------
+
+### Média de gols por partida
+
+```{r}
+tab_media_gols <- dados |>
+  dplyr::filter(score != "x") |>
+  dplyr::group_by(season) |>
+  dplyr::summarise(
+    num_gols = contar_num_gols(score),
+    num_partidas = dplyr::n()
+  ) |>
+  dplyr::mutate(
+    media_gols = num_gols / num_partidas
+  )
+
+media_gols_atual <- tab_media_gols |> 
+  dplyr::filter(season == max(season)) |> 
+  dplyr::pull(media_gols) |> 
+  round(2)
+
+valueBox(
+  media_gols_atual,
+  caption = glue::glue("Média de gols por partida em {max(tab_media_gols$season)}")
+)
+```
+
+### Proporção de vitória dos mandantes
+
+```{r}
+tab_vencedores <- dados |>
+  dplyr::filter(score != "x") |>
+  dplyr::mutate(
+    vencedor = purrr::map_chr(score, verificar_vencedor)
+  ) |>
+  dplyr::count(season, vencedor) |>
+  dplyr::group_by(season) |> 
+  dplyr::mutate(prop = n / sum(n)) |> 
+  dplyr::ungroup()
+
+prop_vit_mandantes <- tab_vencedores |> 
+  dplyr::filter(season == max(season), vencedor == "mandante") |> 
+  dplyr::pull(prop) |> 
+  scales::percent(accuracy = 0.1, big.mark = ".", decimal.mark = ",")
+
+valueBox(
+  prop_vit_mandantes,
+  caption = glue::glue("Proporção de vitória dos mandantes em {max(tab_media_gols$season)}")
+)  
+```
+
+### Proporção de vitória dos visitantes
+
+```{r}
+prop_vit_mandantes <- tab_vencedores |> 
+  dplyr::filter(season == max(season), vencedor == "visitante") |> 
+  dplyr::pull(prop) |> 
+  scales::percent(accuracy = 0.1, big.mark = ".", decimal.mark = ",")
+
+valueBox(
+  prop_vit_mandantes,
+  caption = glue::glue("Proporção de vitória dos vistantes em {max(tab_media_gols$season)}")
+) 
+```
+
+
+Row {.tabset}
+-----------------------------------------------------------------------
+
+### Média de gols por partida 
+
+```{r}
+tab_media_gols |> 
+  dplyr::mutate(season = as.character(season)) |> 
+  echarts4r::e_chart(x = season) |> 
+  echarts4r::e_line(serie = media_gols) |> 
+  echarts4r::e_tooltip()
+  
+```
+
+
+### Proporção de vitória dos mandantes 
+
+```{r}
+tab_vencedores |> 
+  dplyr::filter(vencedor == "mandante") |> 
+  dplyr::mutate(season = as.character(season)) |> 
+  echarts4r::e_chart(x = season) |> 
+  echarts4r::e_line(serie = prop) |> 
+  echarts4r::e_tooltip()
+  
+```
+
+### Proporção de vitória dos vistantes 
+
+```{r}
+tab_vencedores |> 
+  dplyr::filter(vencedor == "visitante") |> 
+  dplyr::mutate(season = as.character(season)) |> 
+  echarts4r::e_chart(x = season) |> 
+  echarts4r::e_line(serie = prop) |> 
+  echarts4r::e_tooltip()
+  
+```
+
+Página 2
+==============================================================
+
+
